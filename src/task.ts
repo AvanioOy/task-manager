@@ -1,21 +1,22 @@
 import * as EventEmitter from 'events';
 import TypedEmitter from 'typed-emitter';
-import {AnyTaskStep, TaskStep, TaskStepAsJson, TaskStepToJson} from './taskStep';
+import {AnyTaskStep, TaskStepAsJson, TaskStepToJson} from './taskStep';
 import {v4 as uuidV4} from 'uuid';
 import {getError, TaskAggregateError, TaskDateError, TaskError} from './error';
+import {AnyTaskStepGroup, TaskStepGroup} from './taskStepGroup';
 
 type TaskEvents = {
-	stepStatus: (self: TaskStep<string, any>) => void;
-	stepAction: (self: TaskStep<string, any>, data: unknown) => void;
+	stepStatus: (self: AnyTaskStep) => void;
+	stepAction: (self: AnyTaskStep, data: unknown) => void;
 };
 
-interface InitialTaskProps<T extends string, TS = AnyTaskStep> {
+interface InitialTaskProps<T extends string, TS = AnyTaskStep | AnyTaskStepGroup> {
 	type: T;
 	uuid?: string;
 	steps: TS[];
 }
 
-export interface TaskProps<T extends string, TS = AnyTaskStep> {
+export interface TaskProps<T extends string, TS = AnyTaskStep | AnyTaskStepGroup> {
 	type: T;
 	uuid: string;
 	steps: TS[];
@@ -44,14 +45,19 @@ export abstract class Task<T extends string, TS extends AnyTaskStep, TSJ = TaskS
 			this.props = {uuid: uuidV4(), ...props};
 		}
 		this.uuid = this.props.uuid;
-		this.props.steps.forEach((s) => s.on('status', (taskStep) => this.emit('stepStatus', taskStep)));
-		this.props.steps.forEach((s) => s.on('action', (taskStep, data) => this.emit('stepAction', taskStep, data)));
+		// hook emitters
+		this.buildStepList().forEach((step) => {
+			step.on('status', (taskStep) => this.emit('stepStatus', taskStep));
+			step.on('action', (taskStep, data) => this.emit('stepAction', taskStep, data));
+		});
 	}
 	public async start(): Promise<void> {
-		this.props.steps.filter((step) => step.status() === 'init').forEach((step) => step.status('pending'));
+		this.buildStepList()
+			.filter((step) => step.status() === 'init')
+			.forEach((step) => step.status('pending'));
 		const errorList: TaskDateError[] = [];
-		for (const step of this.props.steps.filter((step) => {
-			const status = step.status();
+		for (const step of this.buildStepList().filter((cs) => {
+			const status = cs.status();
 			return status === 'pending' || status === 'running';
 		})) {
 			try {
@@ -68,7 +74,7 @@ export abstract class Task<T extends string, TS extends AnyTaskStep, TSJ = TaskS
 		}
 	}
 	public async runNext(): Promise<{step: AnyTaskStep; data: unknown} | undefined> {
-		const step = this.props.steps.find((s) => s.status() === 'init');
+		const step = this.buildStepList().find((s) => s.status() === 'init');
 		if (!step) {
 			return;
 		}
@@ -77,13 +83,13 @@ export abstract class Task<T extends string, TS extends AnyTaskStep, TSJ = TaskS
 	}
 	public async rollback({force}: {force?: boolean} = {force: false}): Promise<void> {
 		if (!force) {
-			const supportRollback = this.props.steps.reduce((acc, step) => acc || step.getOptions()?.supportRollback || false, false);
+			const supportRollback = this.buildStepList().reduce((acc, step) => acc || step.getOptions()?.supportRollback || false, false);
 			if (!supportRollback) {
 				throw new TaskError('not all task steps support rollback');
 			}
 		}
 		const errorList: TaskDateError[] = [];
-		for (const step of [...this.props.steps].reverse()) {
+		for (const step of [...this.buildStepList()].reverse()) {
 			try {
 				await step.cancel();
 			} catch (err) {
@@ -95,12 +101,15 @@ export abstract class Task<T extends string, TS extends AnyTaskStep, TSJ = TaskS
 		}
 	}
 	public isReady(): boolean {
-		return this.props.steps.every((step) => step.isDone());
+		return this.buildStepList().every((step) => step.isDone());
 	}
 	public toJSON(): TaskPropsJson<T, TSJ> {
 		return {
 			...this.props,
 			steps: this.props.steps.map((step) => step.toJSON()),
 		};
+	}
+	private buildStepList(): AnyTaskStep[] {
+		return this.props.steps.reduce<AnyTaskStep[]>((acc, step) => (step instanceof TaskStepGroup ? [...acc, ...step.props.steps] : [...acc, step]), []);
 	}
 }
