@@ -1,7 +1,10 @@
 import {Task} from '../../src/task';
 import {InitialTaskStepProps, TaskStep} from '../../src/taskStep';
 
-export class TaskStep1 extends TaskStep<{value: string; roll: number}, {data: string}> {
+export class TaskStep1 extends TaskStep<'step1', {value: string; roll: number}, {data: string}> {
+	public getKey(): 'step1' {
+		return 'step1';
+	}
 	public name() {
 		return Promise.resolve('TaskStep1');
 	}
@@ -30,8 +33,8 @@ export class TaskStep1 extends TaskStep<{value: string; roll: number}, {data: st
 	}
 }
 
-export class Task1 extends Task<'task1'> {
-	constructor(props: InitialTaskStepProps<any>) {
+export class Task1 extends Task<'task1', TaskStep1> {
+	constructor(props: InitialTaskStepProps<string, any>) {
 		super(props);
 	}
 }

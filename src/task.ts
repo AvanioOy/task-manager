@@ -1,39 +1,39 @@
 import * as EventEmitter from 'events';
 import TypedEmitter from 'typed-emitter';
-import {AnyTaskStep, TaskStep, TaskStepProps} from './taskStep';
+import {AnyTaskStep, TaskStep, TaskStepAsJson, TaskStepToJson} from './taskStep';
 import {v4 as uuidV4} from 'uuid';
 import {getError, TaskAggregateError, TaskDateError, TaskError} from './error';
 
 type TaskEvents = {
-	stepStatus: (self: TaskStep<any>) => void;
-	stepAction: (self: TaskStep<any>, data: unknown) => void;
+	stepStatus: (self: TaskStep<string, any>) => void;
+	stepAction: (self: TaskStep<string, any>, data: unknown) => void;
 };
 
-interface InitialTaskProps<T extends string> {
+interface InitialTaskProps<T extends string, TS = AnyTaskStep> {
 	type: T;
 	uuid?: string;
-	steps: TaskStep<T>[];
+	steps: TS[];
 }
 
-export interface TaskProps<T extends string> {
+export interface TaskProps<T extends string, TS = AnyTaskStep> {
 	type: T;
 	uuid: string;
-	steps: TaskStep<T>[];
+	steps: TS[];
 }
 
-export interface TaskPropsJson<T extends string> {
+export interface TaskPropsJson<T extends string, TSJ = TaskStepToJson<string, any>[]> {
 	type: T;
 	uuid: string;
-	steps: TaskStepProps<T>[];
+	steps: TSJ[];
 }
 
 function isTaskProps<T extends string>(props: any): props is TaskProps<T> {
 	return props.type !== undefined && props.uuid !== undefined && Array.isArray(props.steps);
 }
 
-export type AnyTask = Task<string>;
+export type AnyTask = Task<string, AnyTaskStep>;
 
-export abstract class Task<T extends string> extends (EventEmitter as new () => TypedEmitter<TaskEvents>) {
+export abstract class Task<T extends string, TS extends AnyTaskStep, TSJ = TaskStepAsJson<TS>> extends (EventEmitter as new () => TypedEmitter<TaskEvents>) {
 	public readonly uuid: string;
 	protected readonly props: TaskProps<T>;
 	constructor(props: InitialTaskProps<T>) {
@@ -97,7 +97,7 @@ export abstract class Task<T extends string> extends (EventEmitter as new () => 
 	public isReady(): boolean {
 		return this.props.steps.every((step) => step.isDone());
 	}
-	public toJSON(): TaskPropsJson<T> {
+	public toJSON(): TaskPropsJson<T, TSJ> {
 		return {
 			...this.props,
 			steps: this.props.steps.map((step) => step.toJSON()),

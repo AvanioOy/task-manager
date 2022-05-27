@@ -12,12 +12,12 @@ describe('task manager', () => {
 		const mgr = new TaskManager();
 		mgr.addTask(task);
 		let exportData = mgr.toJSON();
-		expect(exportData).to.be.eql([{type: 'task1', steps: [{...initialData, status: 'pending'}], uuid: exportData[0].uuid}]);
+		expect(exportData).to.be.eql([{type: 'task1', steps: [{key: 'step1', ...initialData, status: 'pending'}], uuid: exportData[0].uuid}]);
 		expect(await taskStep1.wait()).to.be.eql({data: 'demo world!'});
 		exportData = mgr.toJSON();
-		expect(exportData).to.be.eql([{type: 'task1', steps: [{...initialData, status: 'success', roll: 1}], uuid: exportData[0].uuid}]);
+		expect(exportData).to.be.eql([{type: 'task1', steps: [{key: 'step1', ...initialData, status: 'success', roll: 1}], uuid: exportData[0].uuid}]);
 		await task.rollback();
 		exportData = mgr.toJSON();
-		expect(exportData).to.be.eql([{type: 'task1', steps: [{...initialData, status: 'init'}], uuid: exportData[0].uuid}]);
+		expect(exportData).to.be.eql([{type: 'task1', steps: [{key: 'step1', ...initialData, status: 'init'}], uuid: exportData[0].uuid}]);
 	});
 });

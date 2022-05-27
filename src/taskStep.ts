@@ -5,11 +5,12 @@ import {TaskStepError} from './error';
 export type TaskStepStatus = 'init' | 'pending' | 'running' | 'rollback' | 'success' | 'failure';
 
 type TaskStepEvents<T = unknown> = {
-	status: (self: TaskStep<any>) => void;
-	action: (self: TaskStep<any>, data: T) => void;
+	status: (self: TaskStep<string, any>) => void;
+	action: (self: TaskStep<string, any>, data: T) => void;
 };
 
-export type InitialTaskStepProps<P> = P & {
+export type InitialTaskStepProps<K, P> = P & {
+	key?: K;
 	status?: TaskStepStatus;
 };
 
@@ -23,18 +24,22 @@ export type TaskStepOptions = {
 	emitData?: boolean;
 };
 
-export type AnyTaskStep = TaskStep<any, any>;
+export type TaskStepToJson<K extends string, P> = TaskStep<K, P>['props'] & {key: K};
+export type TaskStepAsJson<T extends AnyTaskStep> = ReturnType<T['toJSON']>;
 
-export abstract class TaskStep<P, T = unknown> extends (EventEmitter as new () => TypedEmitter<TaskStepEvents>) {
+
+export type AnyTaskStep = TaskStep<string, any, any>;
+
+export abstract class TaskStep<K extends string, P, T = unknown> extends (EventEmitter as new () => TypedEmitter<TaskStepEvents>) {
 	private waitPromise: Promise<T | undefined> | undefined;
 	private waitResolve: ((value: T | undefined | PromiseLike<T | undefined>) => void) | undefined;
 	private waitReject: ((reason?: any) => void) | undefined;
 	private isResolved: boolean = false;
 	private data: T | undefined;
 	protected readonly props: TaskStepProps<P>;
-	constructor(props: InitialTaskStepProps<P>) {
+	constructor({key, ...props}: InitialTaskStepProps<K, P>) {
 		super();
-		this.props = {status: 'init', ...props};
+		this.props = {status: 'init', ...props} as TaskStepProps<P>;
 	}
 	public async action(): Promise<T> {
 		if (this.props.status !== 'pending') {
@@ -112,6 +117,7 @@ export abstract class TaskStep<P, T = unknown> extends (EventEmitter as new () =
 	protected abstract handleAction(): Promise<T>;
 	protected abstract handleCancel(): Promise<boolean>;
 	public abstract name(): Promise<string>;
+	public abstract getKey(): K;
 	public abstract getOptions(): TaskStepOptions;
 	public status(status?: TaskStepStatus): TaskStepStatus {
 		if (status) {
@@ -120,7 +126,10 @@ export abstract class TaskStep<P, T = unknown> extends (EventEmitter as new () =
 		}
 		return this.props.status;
 	}
-	public toJSON(): TaskStepProps<P> {
-		return {...this.props};
+	public toJSON(): TaskStepToJson<K, P> {
+		return {
+			key: this.getKey(),
+			...this.props,
+		};
 	}
 }
