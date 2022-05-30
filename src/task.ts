@@ -53,11 +53,11 @@ export abstract class Task<T extends string, TS extends AnyTaskStep, TSJ = TaskS
 	}
 	public async start(): Promise<void> {
 		this.buildStepList()
-			.filter((step) => step.status() === 'init')
-			.forEach((step) => step.status('pending'));
+			.filter((step) => step.status === 'init')
+			.forEach((step) => (step.status = 'pending'));
 		const errorList: TaskDateError[] = [];
 		for (const step of this.buildStepList().filter((cs) => {
-			const status = cs.status();
+			const status = cs.status;
 			return status === 'pending' || status === 'running';
 		})) {
 			try {
@@ -74,11 +74,11 @@ export abstract class Task<T extends string, TS extends AnyTaskStep, TSJ = TaskS
 		}
 	}
 	public async runNext(): Promise<{step: AnyTaskStep; data: unknown} | undefined> {
-		const step = this.buildStepList().find((s) => s.status() === 'init');
+		const step = this.buildStepList().find((s) => s.status === 'init');
 		if (!step) {
 			return;
 		}
-		step.status('pending');
+		step.status = 'pending';
 		return {step, data: await step.action()};
 	}
 	public async rollback({force}: {force?: boolean} = {force: false}): Promise<void> {
