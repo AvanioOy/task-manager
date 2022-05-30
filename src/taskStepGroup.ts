@@ -24,11 +24,12 @@ export class TaskStepGroup<TS extends AnyTaskStep, TSJ = TaskStepGroupAsJson<TS>
 	private waitResolve: ((value: T | undefined | PromiseLike<T | undefined>) => void) | undefined;
 	private waitReject: ((reason?: any) => void) | undefined;
 	private isResolved: boolean = false;
+	private data: T | undefined;
 	public readonly props: TaskStepGroupProps<TS>;
 	constructor(props: InitialTaskGroupProps<TS>) {
 		this.props = {...props, type: 'TaskStepGroup'};
 	}
-	public async action(): Promise<unknown[]> {
+	public async action(): Promise<ReturnType<typeof this.props.steps[number]['action']>> {
 		const data: unknown[] = [];
 		for (const step of this.props.steps) {
 			data.push(await step.action());
